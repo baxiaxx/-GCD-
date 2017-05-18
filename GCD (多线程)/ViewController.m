@@ -22,7 +22,83 @@
 -(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
 
     
+    [self test5];
+}
 
+/**
+ Dispatch Group
+ */
+-(void)test6{
+
+
+}
+/**
+ dispatch_after
+ 注意: 该函数并不是在指定时间后执行处理,而是在指定时间追加处理到 Dispatch Queue.
+ test5 函数里面的代码的作用与在 3 秒后用 dispatch_async 函数追加到 Block 到 Main Dispatch Queue 相同
+ */
+-(void)test5{
+
+    //在 3 秒后将指定的 Block 追加到 Main Dispatch Queue 中的实现
+    dispatch_time_t time = dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC);
+    
+    NSLog(@"waited at least zero seconds");
+
+    /**
+     dispatch_after
+     @param time 指定时间用的 dispatch_time_t 类型的值. 该值使用 dispatch_time 函数或者 dispatch_walltime 函数生成
+     @param dispatch_get_main_queue 指定要追加处理的 Dispatch Queue
+     @param <#^(void)block#> 指定记述要执行处理的 Block
+     */
+    dispatch_after(time, dispatch_get_main_queue(), ^{
+        
+        NSLog(@"waited at least three seconds");
+    });
+    
+    // dispatch_time 函数能够获取从第一个参数 dispatch_time_t 类型值中指定的时间开始,到第二个参数指定的毫微秒单位时间后的时间.第一个参数经常使用的值是下面的 DISPATCH_TIME_NOW .表示现在的时间.
+    //数值和 NSEC_PER_SEC 的乘积得到单位为毫微秒的数值.
+    dispatch_time_t oneTime = dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC);
+    
+    //dispatch_walltime(<#const struct timespec * _Nullable when#>, <#int64_t delta#>)
+    //dispatch_walltime 函数由 POSIX 中使用的 struct timespec 类型的时间得到 dispatch_time_t 类型的值. dispatch_time 函数通常用于计算相对时间,而 dispatch_walltime 函数用于计算绝对时间.
+    dispatch_time_t tempTime = getDispatchTimeByDate([NSDate date]);
+    NSLog(@"%zd",tempTime);
+}
+dispatch_time_t getDispatchTimeByDate(NSDate *date){
+
+    NSTimeInterval interval;
+    double second,subsecond;
+    struct timespec time;
+    dispatch_time_t milestone;
+    
+    interval = [date timeIntervalSince1970];
+    subsecond = modf(interval, &second);
+    time.tv_sec = second;
+    time.tv_nsec = subsecond * NSEC_PER_SEC;
+    milestone = dispatch_walltime(&time, 0);
+
+    return milestone;
+}
+/**
+ dispatch_set_target_queue 变更已经生成调度队列的执行优先级
+ 
+ 第一个 <#dispatch_queue_t  _Nullable queue#> 传入要变更执行优先级的 Dispatch Queue
+ 第二个 <#dispatch_queue_t  _Nullable queue#> 传入要使用的执行优先级相同优先级的 Global Dispatch Queue
+ dispatch_set_target_queue(<#dispatch_queue_t  _Nullable queue#>, <#dispatch_queue_t  _Nullable queue#>)
+ */
+-(void)test4{
+
+    dispatch_queue_t mySerialDispatchQueue = dispatch_queue_create("com.xiaozhenyang.www.GCD", NULL);
+    
+    dispatch_queue_t globalDispatchQueueBackgroud = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
+    
+    
+    dispatch_set_target_queue(mySerialDispatchQueue, globalDispatchQueueBackgroud);
+
+    /**
+     将 Dispatch Queue 指定为 dispatch_set_target_queue 函数的参数,不仅可以变更 Dispatch Queue 的执行优先级,还可以作成 Dispatch Queue 的执行阶层. 如果在多个 Seriacl Dispatch Queue 中用 dispatch_set_target_queue 函数指定目标为某一个 Seriacl Dispatch Queue 上只能同时执行一个处理.
+     在必须将不可并行执行的处理追加到多个 Seriacl Dispatch Queue 中时,如果使用 dispatch_set_target_queue 函数将目标指定为某一个 Seriacl Dispatch Queue ,即可防止处理并行执行.
+     */
 }
 /**
  Main Dispatch Queue (主调度队列) / Main Dispatch Queue (全局调度队列)
@@ -65,6 +141,16 @@
     
     //获取 Global Dispatch Queue (后台优先级)
     dispatch_queue_t globalDispatchQueueBackground = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
+    
+    //实例
+    dispatch_async(globalDispatchQueueDefault, ^{
+        
+        //在这里处理并行执行的任务
+       dispatch_async(mainDisaptchQueue, ^{
+           
+           //只能在主线程中处理的任务
+       });
+    });
 }
 /**
  dispatch_queue_create
