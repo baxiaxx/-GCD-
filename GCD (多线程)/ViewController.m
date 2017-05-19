@@ -7,6 +7,7 @@
 //
 
 #import "ViewController.h"
+#define ApplicationAddress "com.xiaozhenyang.www.GCD"
 
 @interface ViewController ()
 
@@ -22,15 +23,142 @@
 -(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
 
     
-    [self test5];
+    [self test7];
 }
+/**
+ dispatch_barrier_async  barrier (障碍)
+ */
+-(void)test7{
 
+    dispatch_queue_t queue = dispatch_queue_create(ApplicationAddress, DISPATCH_QUEUE_CONCURRENT);
+    
+    void(^blk_for_waiting)(void) = ^{NSLog(@"blk_for_waiting");};
+    void(^blk0_for_reading)(void) = ^{NSLog(@"blk0_for_reading");};
+    void(^blk1_for_reading)(void) = ^{NSLog(@"blk1_for_reading");};
+    void(^blk2_for_reading)(void) = ^{NSLog(@"blk2_for_reading");};
+    void(^blk3_for_reading)(void) = ^{NSLog(@"blk3_for_reading");};
+    void(^blk4_for_reading)(void) = ^{NSLog(@"blk4_for_reading");};
+    void(^blk5_for_reading)(void) = ^{NSLog(@"blk5_for_reading");};
+    void(^blk6_for_reading)(void) = ^{NSLog(@"blk6_for_reading");};
+    void(^blk7_for_reading)(void) = ^{NSLog(@"blk7_for_reading");};
+
+    //在 blk3_for_reading 处理和 blk4_for_reading 处理之间执行写入处理,并将写入的内容读取 blk4_for_reading 处理及之后的处理中.
+    dispatch_async(queue, blk0_for_reading);
+    dispatch_async(queue, blk1_for_reading);
+    dispatch_async(queue, blk2_for_reading);
+    dispatch_async(queue, blk3_for_reading);
+    /**
+     写入处理,将写入的内容读取之后的处理中...
+     */
+    dispatch_async(queue, blk4_for_reading);
+    dispatch_async(queue, blk5_for_reading);
+    dispatch_async(queue, blk6_for_reading);
+    dispatch_async(queue, blk7_for_reading);
+    dispatch_release(queue);
+    
+    
+    //如果像下面这样简单地在 dispatch_async 函数中加入写入处理,根据 Concurrent Dispatch Queue 性质,就有可能在追加写入处理前面的处理中读取到与期待不符的数据,还可能回因非法访问导致程序异常结束,如果追加多个写入处理,则可能发生更多问题,如数据竞争等...
+    dispatch_async(queue, blk0_for_reading);
+    dispatch_async(queue, blk1_for_reading);
+    dispatch_async(queue, blk2_for_reading);
+    dispatch_async(queue, blk3_for_reading);
+    dispatch_async(queue, blk_for_waiting);
+    dispatch_async(queue, blk4_for_reading);
+    dispatch_async(queue, blk5_for_reading);
+    dispatch_async(queue, blk6_for_reading);
+    dispatch_async(queue, blk7_for_reading);
+    dispatch_release(queue);
+    
+    //这时候就需要使用 dispatch_barrier_async 函数. dispatch_barrier_async 函数会等待追加到 Concurrent Dispatch Queue 上的并执行的处理全部结束之后,再将指定的处理追加到该 Concurrernt Dispatch Queue .然后再由 dispatch_barrier_async 函数追加的处理执行完毕后, Concurrent Dispatch Queue 才恢复为一般的动作,追加到该 Concurrent Dispatch Queue 的处理又开始并执行.
+    dispatch_async(queue, blk0_for_reading);
+    dispatch_async(queue, blk1_for_reading);
+    dispatch_async(queue, blk2_for_reading);
+    dispatch_async(queue, blk3_for_reading);
+    dispatch_barrier_sync(queue, blk_for_waiting);
+    dispatch_async(queue, blk4_for_reading);
+    dispatch_async(queue, blk5_for_reading);
+    dispatch_async(queue, blk6_for_reading);
+    dispatch_async(queue, blk7_for_reading);
+    dispatch_release(queue);
+    
+    /**
+     2017-05-19 17:24:05.714 GCD (多线程)[8622:1289661] blk0_for_reading
+     2017-05-19 17:24:05.714 GCD (多线程)[8622:1289662] blk1_for_reading
+     2017-05-19 17:24:05.714 GCD (多线程)[8622:1287737] blk2_for_reading
+     2017-05-19 17:24:05.714 GCD (多线程)[8622:1289663] blk3_for_reading
+     2017-05-19 17:24:05.715 GCD (多线程)[8622:1286812] blk_for_waiting
+     2017-05-19 17:24:05.715 GCD (多线程)[8622:1289663] blk4_for_reading
+     2017-05-19 17:24:05.715 GCD (多线程)[8622:1287737] blk5_for_reading
+     2017-05-19 17:24:05.715 GCD (多线程)[8622:1289662] blk6_for_reading
+     2017-05-19 17:24:05.715 GCD (多线程)[8622:1289664] blk7_for_reading
+     */
+    //使用 Concurrent Dispatch Queue 和 dispatch_barrier_async 函数可以实现高效率的数据库访问和文件访问.
+}
 /**
  Dispatch Group
  */
 -(void)test6{
 
+    dispatch_queue_t queue = dispatch_queue_create(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    dispatch_group_t group = dispatch_group_create();
+    
+    dispatch_group_async(group, queue, ^{
+        NSLog(@"blk0");
+    });
+    dispatch_group_async(group, queue, ^{
+        NSLog(@"blk1");
+    });
+    dispatch_group_async(group, queue, ^{
+        NSLog(@"blk2");
+    });
+    
+    /**
+     dispatch_group_notify
 
+     @param <#dispatch_group_t  _Nonnull group#> 指定为要监视的 Dispatch Group
+     @param <#dispatch_queue_t  _Nonnull queue#> 指定下面 Block 所在执行的队列
+     @param <#^(void)block#> 处理执行后要执行的任务
+     */
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        NSLog(@"done");
+    });
+    //该方法同 dispatch_group_notify 一样 皆是等全部处理执行结束
+    
+    /**
+     dispatch_group_wait
+
+     @param <#dispatch_group_t  _Nonnull group#> 指定为要监视的 Dispatch Group
+     @param <#dispatch_time_t timeout#> 指定等待的时间 (超时).属于 dispatch_time_t 类型的值.下面代码使用的 DISPATCH_TIME_FOREVER 永久等待.只要属于 Dispatch Group 的处理尚未执行结束,就会一直等待,中途不会取消.
+     */
+    dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+    
+    dispatch_release(group);
+    /**
+     2017-05-19 14:10:51.610 GCD (多线程)[8270:942262] blk0
+     2017-05-19 14:10:51.611 GCD (多线程)[8270:942262] blk1
+     2017-05-19 14:10:51.611 GCD (多线程)[8270:942262] blk2
+     2017-05-19 14:10:51.611 GCD (多线程)[8270:941798] done
+     */
+    
+    dispatch_time_t tiem = dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC);
+    
+    long result = dispatch_group_wait(group, tiem);
+    
+    if (result == 0) {
+        //属于 Dispatch Group 的全部处理执行结束
+    }else{
+        //属于 Dispatch Group 的某一个处理还在执行中
+    }
+    /**
+     注意:1 如果 dispacth_group_wait 函数的返回值不为0,就意味着虽然经过了指定的时间,但属于 Dispatch Group 的某一个处理还在执行中.如果返回值为0,那么全部处理执行结束.当等待时间为 DISPATCH_TIME_FOREVER、 由 dispacth_group_wait 函数返回时,由于属于 Dispatch Group 的处理必定全部执行结束,因此返回值恒为 0.
+         2 这里的 "等待"的意思是一旦调用 dispacth_group_wait 函数,该函数就处于调用的状态而不返回.即执行 dispacth_group_wait 函数的现在的(当前线程)线程停止.在经过 dispacth_group_wait 函数中指定的时间或属于指定 Dispatch Group 的处理全部执行结束之前,执行该函数的线程停止
+     */
+    
+    //指定 DISPATCH_TIME_NOW ,则不用任何等待即可判定属于 Dispatch Group 的处理是否执行结束
+    long result1 = dispatch_group_wait(group, DISPATCH_TIME_NOW);
+    
+    //在主线程的 RunLoop 的每次循环中,可检查执行是否结束,从而不耗费多余的等待时间.虽然这样可以,但一般这种情形下,还是用 dispatch_group_notify 函数追加结束处理到 Main Dispatch Queue 中.这是因为 dispatch_group_notify 函数可以简化代码
 }
 /**
  dispatch_after
@@ -88,7 +216,7 @@ dispatch_time_t getDispatchTimeByDate(NSDate *date){
  */
 -(void)test4{
 
-    dispatch_queue_t mySerialDispatchQueue = dispatch_queue_create("com.xiaozhenyang.www.GCD", NULL);
+    dispatch_queue_t mySerialDispatchQueue = dispatch_queue_create(ApplicationAddress, NULL);
     
     dispatch_queue_t globalDispatchQueueBackgroud = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
     
@@ -168,16 +296,16 @@ dispatch_time_t getDispatchTimeByDate(NSDate *date){
      
      */
     //dispatch_queue_create 创建一个 Serial Dispatch Queue
-    dispatch_queue_t mySeriaclDispatchQueue = dispatch_queue_create("com.xiaozhenyang.www.GCD", NULL);
+    dispatch_queue_t mySeriaclDispatchQueue = dispatch_queue_create(ApplicationAddress, NULL);
     
-    //dispatch_queue_t mySeriaclDispatchQueue = dispatch_queue_create("com.xiaozhenyang.www.GCD", DISPATCH_QUEUE_SERIAL);
+    //dispatch_queue_t mySeriaclDispatchQueue = dispatch_queue_create(ApplicationAddress, DISPATCH_QUEUE_SERIAL);
     
     dispatch_async(mySeriaclDispatchQueue, ^{
         NSLog(@"block on mySeriaclDispatchQueue");
     });
     
     //dispatch_queue_create 创建一个 Conrrent Dispatch Queue
-    dispatch_queue_t myConcurrentDispatchQueue = dispatch_queue_create("com.xiaozhenyang.www.GCD", DISPATCH_QUEUE_CONCURRENT);
+    dispatch_queue_t myConcurrentDispatchQueue = dispatch_queue_create(ApplicationAddress, DISPATCH_QUEUE_CONCURRENT);
     
     dispatch_async(myConcurrentDispatchQueue, ^{
         NSLog(@"block on myConcurrentDispatchQueue");
@@ -211,7 +339,7 @@ dispatch_time_t getDispatchTimeByDate(NSDate *date){
     void(^blk7)(void) = ^{NSLog(@"blk7 = %@",[NSThread currentThread]);[NSThread sleepForTimeInterval:7];};
     
     
-    dispatch_queue_t queue = dispatch_queue_create("com.xiaozhenyang.www.GCD", DISPATCH_QUEUE_CONCURRENT);
+    dispatch_queue_t queue = dispatch_queue_create(ApplicationAddress, DISPATCH_QUEUE_CONCURRENT);
     
     dispatch_async(queue, blk0);
     dispatch_async(queue, blk1);
@@ -236,7 +364,7 @@ dispatch_time_t getDispatchTimeByDate(NSDate *date){
 }
 -(void)test0{
 
-    dispatch_queue_t queue = dispatch_queue_create("com.xiaozhenyang.www.GCD", DISPATCH_QUEUE_CONCURRENT);
+    dispatch_queue_t queue = dispatch_queue_create(ApplicationAddress, DISPATCH_QUEUE_CONCURRENT);
     
     //dispatch 调度
     //async 异步
