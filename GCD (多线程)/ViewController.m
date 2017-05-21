@@ -23,7 +23,56 @@
 -(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
 
     
-    [self test8];
+    [self test9];
+}
+/**
+ dispatch_apply (apply 应用)
+ */
+-(void)test9{
+
+
+    /**
+     dispatch_sync 函数是 dispatch_sync 函数和 Dispatch Group 的关联 API. 该函数按指定的次数将指定的 Block 追加到指定的 Dispatch Queue 中,并等待全部执行结束.
+     */
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    /**
+     dispatch_apply
+     @param <#size_t iterations#> 重复次数
+     @param <#dispatch_queue_t  _Nonnull queue#> 追加对象的 Dispatch Queue
+     @param <#^(size_t)block#> 追加的处理 该参数的 Block 带有参数
+     dispatch_apply(<#size_t iterations#>, <#dispatch_queue_t  _Nonnull queue#>, <#^(size_t)block#>)
+     */
+    dispatch_apply(10, queue, ^(size_t index) {
+        NSLog(@"%zu",index);
+    });
+    NSLog(@"done");
+    /**
+     2017-05-21 12:02:31.763 GCD (多线程)[6736:99643] 0
+     2017-05-21 12:02:31.763 GCD (多线程)[6736:101912] 1
+     2017-05-21 12:02:31.763 GCD (多线程)[6736:101913] 2
+     2017-05-21 12:02:31.763 GCD (多线程)[6736:101115] 3
+     2017-05-21 12:02:31.764 GCD (多线程)[6736:99643] 4
+     2017-05-21 12:02:31.764 GCD (多线程)[6736:101912] 5
+     2017-05-21 12:02:31.764 GCD (多线程)[6736:101115] 7
+     2017-05-21 12:02:31.764 GCD (多线程)[6736:101913] 6
+     2017-05-21 12:02:31.765 GCD (多线程)[6736:101912] 9
+     2017-05-21 12:02:31.765 GCD (多线程)[6736:99643] 8
+     2017-05-21 12:02:31.765 GCD (多线程)[6736:99643] done
+     */
+    //从输出结果可以看出,最后输出的 done 是因为 dispatch_apply 函数会等待全部执行处理结束才会执行.
+    
+    //例子
+    NSArray *array = @[@"123",@123,@"张三",@"李四"];
+    
+    dispatch_queue_t queue1 = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    dispatch_apply(array.count, queue1, ^(size_t index) {
+        NSLog(@"%zu:%@",index,[array objectAtIndex:index]);
+        NSLog(@"%@",[NSThread currentThread]);
+    });
+    //从上面的例子可以看出,
+    
 }
 /**
  dispatch_sync sync (synchronous(同步)) (意思是 "非异步" asynchronous(异步))
