@@ -23,7 +23,46 @@
 -(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
 
     
-    [self test7];
+    [self test8];
+}
+/**
+ dispatch_sync sync (synchronous(同步)) (意思是 "非异步" asynchronous(异步))
+ */
+-(void)test8{
+
+    /**
+     dispatch_sync 函数将指定的 Block "非同步"追加到指定的 Dispatch Queue 中. dispatch_async 函数不做任何等待.
+     */
+    
+    //情况: 执行 Mian Dispatch Queue 时,使用另外的线程 Global Dispatch Queue 进行处理,处理之后立即使用所得到的结果.此时,要使用 dispatch_sync 函数
+    
+    dispatch_queue_t queue = dispatch_queue_create(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    dispatch_sync(queue, ^{/**要处理的*/});
+    
+    /**
+     注意: 一旦使用了 dispatch_sync 函数,在指定的处理结束之前,该函数不会返回.类似于 dispatch_group_wait 函数.但是该函数会造成 死锁
+     */
+    //死锁例子
+    dispatch_queue_t queue0 = dispatch_get_main_queue();
+    
+    dispatch_sync(queue0, ^{NSLog(@"死锁");});
+    //上面代码会卡死在 dispatch_sync(queue0, ^{NSLog(@"死锁");});. 原因是代码在 Mian Dispacth Queue 主线程执行指定的 Block,并等待其执行结束.而其实在主线程中正在执行这些代码.所以无法执行追加到 Mian Dispatch Queue 的Blcok
+    
+    //下面的例子与上面是一个问题
+    dispatch_queue_t queue1 = dispatch_get_main_queue();
+    
+    dispatch_async(queue1, ^{
+        dispatch_sync(queue1, ^{NSLog(@"死锁");});
+    });
+    //上面代码在 Mian Dispacth Queue 中执行的 Block 等待 Mian Dispatch Queue 中要执行的 Block 执行结束.这样会导致死锁.
+    
+    //对于 Serial Dispatch Queue 也会造成死锁
+    dispatch_queue_t queue2 = dispatch_queue_create(ApplicationAddress, 0);
+    dispatch_async(queue2, ^{
+       dispatch_sync(queue2, ^{NSLog(@"死锁");});
+    });
+    
 }
 /**
  dispatch_barrier_async  barrier (障碍)
