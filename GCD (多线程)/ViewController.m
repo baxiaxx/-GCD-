@@ -149,6 +149,35 @@
     });
     //启动 Dispatch Source
     dispatch_resume(source);
+    
+    /**
+     与上面源代码非常相似的代码,使用在了 Core Foundation 框架的异步网络的 API CFSocket 中,因为 Foundation 框架的异步网络 API 是通过 CFSocket 实现的,所以可享受到仅使用 Foundation 框架的 Dispatch Source (GCD) 带来的好处
+     */
+    //下面是一个 DISPATCH_SOURCE_TYPE_TIMER 使用例子
+    /**
+     指定 DISPATCH_SOURCE_TYPE_TIMER 作出 Dispatch Source.在定时器经过指定时间时设定 Main Dispatch Queue 为追加处理的 Dispatch Queue
+     */
+    dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    
+    //将定时器设定为 15s 后,不指定为重复,允许延迟1s
+    dispatch_source_set_timer(timer, 15 *NSEC_PER_SEC, DISPATCH_TIME_FOREVER, 1 *NSEC_PER_SEC);
+    
+    //指定定时器指定时间内执行的处理
+    dispatch_source_set_event_handler(timer, ^{
+        NSLog(@"wakeup");
+        //取消 Dispatch Source
+        dispatch_source_cancel(source);
+    });
+    
+    //指定取消 Dispatch Source 时的处理
+    dispatch_source_set_cancel_handler(timer, ^{
+        NSLog(@"canceled");
+        //释放 Dispatch Source(自身)
+        dispatch_release(timer);
+    });//启动 Dispatch Source
+    dispatch_resume(timer);
+    //从上面的代码可以看出,异步读取文件映射的代码和定时器的代码知道, Dispatch Queue 没有 "取消" 这个概念,一旦将处理追加到 Dispatch Queue 中,就没有方法可以将其移除.也没有方法可在执行中取消该处理,
+    //注: Dispatch Source 和 Dispatch Queue 不同,是可以取消的, 而且取消时必须执行的处理可指定为回调的 Blok 形式.所以使用 Dispatch Source 实现 XNU 内核中发生的事件处理要比直接使用 kqueue 实现更为简单,
 }
 /**
  Dispatch Queue
