@@ -5,6 +5,66 @@
 //  Created by 一天 on 2017/5/17.
 //  Copyright © 2017年 肖振阳. All rights reserved.
 //
+/**
+1.概念和理解
+     Grand Central Dispatch（多线程的优化技术）GCD
+     是一套底层API，基于C语言开发的多线程机制，提供了新的模式编写并发执行的程序。
+     特点：
+     1.允许将一个程序切分为多个单一任务，然后提交到工作队列中并发或者串行地执行
+     2.为多核的并行运算提出了解决方案，自动合理的利用CPU内核（比如双核，四核）
+     3.自动的管理线程的生命周期（创建线程、调度任务、销毁线程），完全不需要我们管理，只需要告诉它任务是什么就行
+     4.配合Block，使得使用起来更加方便灵活
+ 2.什么是Queue队列？
+     GCD使用了队列的概念，解决了NSThread难于管理的问题，队列实际上就是数组的概念，通常我们把要执行的任务放到队列中管理
+     特点：
+     1.按顺序执行，先进先出
+     2.可以管理多线程，管理并发的任务，设置主线程
+     3.GCD的队列是任务的队列，而不是线程的队列
+ 3.什么是任务？
+     任务即操作：你想要干什么，说白了就是一段代码，在GCD中，任务就是一个block
+     任务的两种执行方式：
+     同步执行：只要是同步任务，都会在当前的线程执行，不会另开线程
+     异步执行：只要是异步任务，都会开启新线程，在开启的线程中执行
+ 4.什么是串行队列？
+     依次完成每一任务
+ 5.什么是并行队列？
+     好像所有的任务都是在同一时间执行的
+ 6.都有哪些队列？
+     Main Queue(主队列，串行)；全局队列（Global Queue）；自己创建的队列（Queue）
+     从上面的概念以及gcd所解决的问题来看，使用GCD的时候就要开始转变观念了。现在我们需要考虑的只是任务，队列，队列间同步或异步的关系了。而不是考虑怎么开辟线程，怎么管理线程，所有关于线程的东西，我们都不需要考虑。整个程序完全就是由队列来自动管理了。首先，整个程序是由全局队列来管理，然后UI的刷新是由mainqueue管理，我们可以将我们的任务放到我们创建的队列中去，也可以放在主队列中，也可以放在全局队列中。
+*/
+/**
+ 1， 同步，异步，串行，并发
+     同步和异步代表会不会开辟新的线程。串行和并发代表任务执行的方式。
+     同步串行和同步并发，任务执行的方式是一样的。没有区别，因为没有开辟新的线程，所有的任务都是在一条线程里面执行。
+     异步串行和异步并发，任务执行的方式是有区别的，异步串行会开辟一条新的线程，队列中所有任务按照添加的顺序一个一个执行，异步并发会开辟多条线程，至于具体开辟多少条线程，是由系统决定的，但是所有的任务好像就是同时执行的一样。
+     开辟队列的方法：
+     dispatch_queue_t myQueue = dispatch_queue_create("MyQueue", NULL);
+     参数1：标签，用于区分队列
+     参数2：队列的类型，表示这个队列是串行队列还是并发队列NUll表示串行队列，
+     DISPATCH_QUEUE_CONCURRENT表示并发队列
+     
+    执行队列的方法
+    异步执行
+    dispatch_async(<#dispatch_queue_t queue#>, <#^(void)block#>)
+    同步执行
+    dispatch_sync(<#dispatch_queue_t queue#>, <#^(void)block#>)
+ 二，主队列
+     主队列：专门负责调度主线程度的任务，没有办法开辟新的线程。所以，在主队列下的任务不管是异步任务还是同步任务都不会开辟线程，任务只会在主线程顺序执行。
+     主队列异步任务：现将任务放在主队列中，但是不是马上执行，等到主队列中的其它所有除我们使用代码添加到主队列的任务的任务都执行完毕之后才会执行我们使用代码添加的任务。
+     主队列同步任务：容易阻塞主线程，所以不要这样写。原因：我们自己代码任务需要马上执行，但是主线程正在执行代码任务的方法体，因此代码任务就必须等待，而主线程又在等待代码任务的完成好去完成下面的任务，因此就形成了相互等待。整个主线程就被阻塞了。
+ 三，全局队列
+     全局队列：本质是一个并发队列，由系统提供，方便编程，可以不用创建就直接使用。
+     获取全局队列的方法：dispatch_get_global_queue(long indentifier.unsigned long flags)
+     
+     参数说明：
+     参数1：代表该任务的优先级，默认写0就行，不要使用系统提供的枚举类型，因为ios7和ios8的枚举数值不一样，使用数字可以通用。
+     参数2：苹果保留关键字，一般也写0
+    全局队列和并发队列的区别：
+    1，全局队列没有名字，但是并发队列有名字。有名字可以便于查看系统日志
+    2，全局队列是所有应用程序共享的。
+    3，在mrc的时候，全局队列不用手动释放，但是并发队列需要。
+ */
 
 #import "ViewController.h"
 #define ApplicationAddress "com.xiaozhenyang.www.GCD"
@@ -24,6 +84,225 @@
 
     
     [self test11];
+}
+/**
+ Dispatch Source
+ */
+-(void)test15{
+
+    /**
+     Dispatch Source 的种类
+     DISPATCH_SOURCE_TYPE_DATA_ADD    变量增加
+     DISPATCH_SOURCE_TYPE_DATA_OR     变量 OR
+     DISPATCH_SOURCE_TYPE_MACH_SEND   MACH 端口发送
+     DISPATCH_SOURCE_TYPE_MACH_RECV   MACH 端口接受
+     DISPATCH_SOURCE_TYPE_PROC        检测到与进程相关的事件
+     DISPATCH_SOURCE_TYPE_READ        可读取文件映射
+     DISPATCH_SOURCE_TYPE_SIGNAL      接收信号
+     DISPATCH_SOURCE_TYPE_TIMER       定时器
+     DISPATCH_SOURCE_TYPE_VNODE       文件系统有变更
+     DISPATCH_SOURCE_TYPE_WRITE       可写入文件映射
+    */
+    //事件发生时,在指定的 Dispatch Queue 中可执行事件的处理
+
+    __block size_t total = 0;
+    size_t size =  100; //要读取的字节数
+    char *buff = (char *)malloc(size);
+     int sockfd = 10;
+    //设定为异步映象
+    fcntl(sockfd, 1);
+    //获取用于追加事件的 Global Disaptch Queue
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    //基于 READ 事件时执行的处理
+    dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, 1, 0, queue);
+    
+    //指定发生 READ 事件时执行的处理
+    dispatch_source_set_event_handler(source, ^{
+       
+        //获取可读取的字节数
+        size_t available = dispatch_source_get_data(source);
+        
+        //从映像中获取
+        int lenght = read(sockfd, buff, available);
+        
+        //发生错误时取消 Dispatch Source
+        if (lenght < 0 ) {
+            //错误处理
+            dispatch_source_cancel(source);
+        }
+        total += lenght;
+        if (total == size) {
+            
+            //buff 的处理,处理结束,取消 Dispatch Source
+            dispatch_source_cancel(source);
+        }
+    });
+    
+    //指定取消 Dispatch Source 时的处理
+    dispatch_source_set_cancel_handler(source, ^{
+        free(buff);
+        close(sockfd);
+        
+        //释放 Dispatch Source (自身)
+        dispatch_release(source);
+    });
+    //启动 Dispatch Source
+    dispatch_resume(source);
+}
+/**
+ Dispatch Queue
+ */
+-(void)test14{
+
+    /**
+     GCD 的实现
+     需要1. 用于管理追加的 Block 的 C 语言层实现的 FIFO 队列
+        2. Atomic 函数中实现的用于排他控制的轻量级信号
+        3. 用于管理线程的 C 语言层实现的一些容器
+     */
+    
+    // Main Dispatch Queue 在 RunLoop 中执行的 Block\
+        Global Dispatch Queue 有下面 8种
+    /**
+     Global Dispatch Queue (High Priority)
+     Global Dispatch Queue (Default Priority)
+     Global Dispatch Queue (Low Priority)
+     Global Dispatch Queue (Background Priority)
+     Global Dispatch Queue (High Overcommit Priority)
+     Global Dispatch Queue (Default Overcommit Priority)
+     Global Dispatch Queue (Low Overcommit Priority)
+     Global Dispatch Queue (Background Overcommit Priority)
+     */
+    //注: 优先级附有 Overcommit 的 Global Dispatch Queue 使用在 Serial Dispatch Queue 中.如 Overcommit 这个名称所示,不管系统状态如何,都会强制生成线程的 Dispatch Queue.
+    
+}
+/**
+ Dispatch I/O (实现一次使用多个线程更快速的读取数据)
+ */
+-(void)test13{
+
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    dispatch_async(queue, ^{/** 读取    0  ~ 8191 字节*/});
+    dispatch_async(queue, ^{/** 读取  8192 ~ 16383 字节*/});
+    dispatch_async(queue, ^{/** 读取 16384 ~ 24575 字节*/});
+    dispatch_async(queue, ^{/** 读取 24576 ~ 32767 字节*/});
+    dispatch_async(queue, ^{/** 读取 32768 ~ 40959 字节*/});
+    dispatch_async(queue, ^{/** 读取 40960 ~ 49151 字节*/});
+    dispatch_async(queue, ^{/** 读取 49152 ~ 57343 字节*/});
+    dispatch_async(queue, ^{/** 读取 57344 ~ 65535 字节*/});
+
+    //上面是将文件分割一块块的进行读取处理, 这样的读取数据可以使用 Dispatch Data
+    
+    //下面是苹果提供的例子
+    /**
+    static int
+    _asl_auxiliary(aslmsg msg, const charchar *title, const charchar *uti, const charchar *url, intint *out_fd)
+    {
+        asl_msg_t *merged_msg;
+        asl_msg_aux_t aux;
+        asl_msg_aux_0_t aux0;
+        fileport_t fileport;
+        kern_return_t kstatus;
+        uint32_t outlen, newurllen, len, where;
+        int status, fd, fdpair[2];
+        caddr_t out, newurl;
+        dispatch_queue_t pipe_q;
+        dispatch_io_t pipe_channel;
+        dispatch_semaphore_t sem;
+        ..... 此处省略若干代码.....
+        
+        // 创建串行队列
+        pipe_q = dispatch_queue_create("PipeQ", NULL);
+        // 创建 Dispatch I／O
+        pipe_channel = dispatch_io_create(DISPATCH_IO_STREAM, fd, pipe_q, ^(int err){
+            close(fd);
+        });
+        
+        *out_fd = fdpair[1];
+        
+        // 该函数设定一次读取的大小（分割大小）
+        dispatch_io_set_low_water(pipe_channel, SIZE_MAX);
+        //
+        dispatch_io_read(pipe_channel, 0, SIZE_MAX, pipe_q, ^(bool done, dispatch_data_t pipedata, int err){
+            if (err == 0) // err等于0 说明读取无误
+            {
+                // 读取完“单个文件块”的大小
+                size_t len = dispatch_data_get_size(pipedata);
+                if (len > 0)
+                {
+                    // 定义一个字节数组bytes
+                    const charchar *bytes = NULL;
+                    charchar *encoded;
+                    
+                    dispatch_data_t md = dispatch_data_create_map(pipedata, (const voidvoid **)&bytes, &len);
+                    encoded = asl_core_encode_buffer(bytes, len);
+                    asl_set((aslmsg)merged_msg, ASL_KEY_AUX_DATA, encoded);
+                    free(encoded);
+                    _asl_send_message(NULL, merged_msg, -1, NULL);
+                    asl_msg_release(merged_msg);
+                    dispatch_release(md);
+                }
+            }
+            
+            if (done)
+            {  
+                dispatch_semaphore_signal(sem);  
+                dispatch_release(pipe_channel);  
+                dispatch_release(pipe_q);  
+            }  
+        });  
+    }
+    */
+    
+    /**
+     dispatch_io_create
+     @param <#dispatch_io_type_t type#> 读写操作按顺序依次顺序进行。在读或写开始时，操作总是在文件指针位置读或写数据。读和写操作可以在同一个信道上同时进行。随机访问文件。读和写操作可以同时执行这种类型的通道,文件描述符必须是可寻址的。
+     @param <#dispatch_fd_t fd#> 文件描述符
+     @param <#dispatch_queue_t  _Nonnull queue#> 发生错误时用来执行处理的 Dispatch Queue
+     @param error <#^(int error)cleanup_handler#> 发生错误时用来执行处理的 Block
+     dispatch_io_create(<#dispatch_io_type_t type#>, <#dispatch_fd_t fd#>, <#dispatch_queue_t  _Nonnull queue#>, <#^(int error)cleanup_handler#>)
+     */
+    
+    /**
+     dispatch_io_set_low_water
+     @param <#dispatch_io_t  _Nonnull channel#>
+     @param <#size_t low_water#> 设定一次读取的大小(分割大小).
+     dispatch_io_set_low_water(<#dispatch_io_t  _Nonnull channel#>, <#size_t low_water#>)
+     */
+    
+    /**
+     dispatch_io_read 使用 Global Dispatch Queue 开始并列读取.每当各个分割的文件读取结果结束时,将含有文件块数据的 Dispatch Data 传递给 Dispatch_io_read 函数指定的读取结束时回调用的 Block. 回调用的 Block 分析传递过来的 Dispatch Data 并进行结合处理.
+     @param <#dispatch_io_t  _Nonnull channel#>
+     @param <#off_t offset#>
+     @param <#size_t length#>
+     @param <#dispatch_queue_t  _Nonnull queue#>
+     @param done <#done description#>
+     @param data <#data description#>
+     @param error <#error description#>
+     dispatch_io_read(<#dispatch_io_t  _Nonnull channel#>, <#off_t offset#>, <#size_t length#>, <#dispatch_queue_t  _Nonnull queue#>, <#^(bool done, dispatch_data_t  _Nullable data, int error)io_handler#>)
+     */
+   //注:以上3个函数的使用 http://www.cocoachina.com/industry/20130821/6842.html
+}
+/**
+ dispatch_once (保证代码在程序中只执行一次)
+ */
+-(void)test12{
+
+    static int initialized = NO;
+    
+    if (initialized == NO) {
+        //初始化
+        initialized = YES;
+    }
+    //使用 dispatch_once
+    
+    static dispatch_once_t pred;
+    
+    dispatch_once(&pred, ^{
+        //初始化
+    });
 }
 /**
  Dispatch Semaphore (Semaphore 信号)

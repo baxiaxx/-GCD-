@@ -36,6 +36,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C852FD8A1ED2DDD900E4A684 /* libc.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libc.tbd; path = usr/lib/libc.tbd; sourceTree = SDKROOT; };
 		C8633F0D1ECC4F64004ABE46 /* GCD (多线程).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "GCD (多线程).app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C8633F111ECC4F64004ABE46 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		C8633F131ECC4F64004ABE46 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -81,6 +82,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C852FD891ED2DDD900E4A684 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C852FD8A1ED2DDD900E4A684 /* libc.tbd */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		C8633F041ECC4F64004ABE46 = {
 			isa = PBXGroup;
 			children = (
@@ -88,6 +97,7 @@
 				C8633F291ECC4F64004ABE46 /* GCD (多线程)Tests */,
 				C8633F341ECC4F65004ABE46 /* GCD (多线程)UITests */,
 				C8633F0E1ECC4F64004ABE46 /* Products */,
+				C852FD891ED2DDD900E4A684 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
