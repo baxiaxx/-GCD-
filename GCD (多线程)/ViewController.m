@@ -23,7 +23,105 @@
 -(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
 
     
-    [self test9];
+    [self test11];
+}
+/**
+ Dispatch Semaphore (Semaphore 信号)
+ */
+-(void)test11{
+
+    //情况: 在不考虑顺序下,将所有数据追加到 NSMutableArray 中
+    
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    NSMutableArray *array = [[NSMutableArray alloc]init];
+    
+    for (int i = 0; i < 100000; i++) {
+        dispatch_async(queue, ^{
+            [array addObject:[NSNumber numberWithInt:i]];
+        });
+    }
+    //以上代码执行后会出现由于内存错误导致应用异常结束的概率较高,此时应该使用 Dispatch Semaphore 函数
+    /**
+     Dispatch Semaphore 是持有计数的信号,该计数是多线程编程中的计数类型信号.在 Dispatch Semaphore 中,使用计数来实现该功能.计数为 0 时等待,计数为 1 或是大于 1 时,减去 1 而不等待.
+     */
+    // 初始化 dispatch_semaphore_t 例子代码将计数值初始化为 1. 从 create 可以看出该函数与 Dispatch Queue 和 Dispatch Group 一样.需要通过 dispatch_release 释放 dispatch_retain 持有
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(1);
+    
+     /**
+      dispatch_semaphore_wait
+      @param <#dispatch_semaphore_t  _Nonnull dsema#>
+      @param <#dispatch_time_t timeout#> 指定等待的时间 (超时).属于 dispatch_time_t 类型的值.与 dispatch_group_wait 函数等相同
+      dispatch_semaphore_wait(<#dispatch_semaphore_t  _Nonnull dsema#>, <#dispatch_time_t timeout#>)
+      dispatch_semaphore_wait 函数等待 Dispatch Semaphore 的计数值到大于或等于 1. 当计数值大于等于 1,或者在待机中计数值大于等于 1时,对该计数进行减法并从 dispatch_semaphore_wait 函数返回.第二个参数与 dispatch_group_wait 函数等相同.下面的代码是永久等待. 而且 dispatch_semaphore_wait 的返回值与 dispatch_group_wait 一样
+      */
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    
+    //例子
+    dispatch_time_t time = dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC);
+    
+    long result = dispatch_semaphore_wait(semaphore, time);
+    
+    if (result == 0) {
+        /**
+         由于 Dispatch Semaphore 的计数值达到大于等于 1.或者在待机中的指定时间内, Dispatch Semaphore 的计数值达到大于等于 1.所以 Dispatch Semaphore 的计数值减去 1.可执行需要进行排他控制的处理.
+         */
+        NSLog(@"%ld",result);
+    }else{
+        /**
+         由于 Dispatch Semaphore 的计数值为 0 所以在达到指定时间为止待机.
+         */
+        NSLog(@"%ld",result);
+    }
+    // dispatch_semaphore_wait 函数返回 0时,可安全地执行需要进行排他控制的处理.该处理结束时通过 dispatch_semaphore_signal 函数将 Dispatch Semaphore 的计数值加 1.
+
+    dispatch_queue_t queue1 = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    dispatch_semaphore_t semaphore1 = dispatch_semaphore_create(1);
+    NSMutableArray *array1 = [[NSMutableArray alloc]init];
+    for (int i = 0; i < 100000; i++) {
+        dispatch_async(queue1, ^{
+            /**
+             等待 Dispatch Semaphore 直到 Dispatch Semaphore 的计数值达到大于等于 1.
+             */
+            dispatch_semaphore_wait(semaphore1, DISPATCH_TIME_FOREVER);
+            
+            /**
+             由于 Dispatch Semaohore 的计数值达到等于 1.所以将 Dispatch Semaphore 的计数值减去 1. dispatch_semaphore_wait 函数执行返回.即执行到此时的 Dispatch Semaphore 的计数值恒为 "0".由于可访问 NSMutableArray 类对象的线程,只有 1个.因此可安全地进行更新
+             */
+            [array1 addObject:[NSNumber numberWithInt:i]];
+            
+            /**
+             排他控制处理结束,所以通过 dispatch_semaphore_sigal 函数,将 Dispatch Semaphore 的计数值加1 .如果有通过 dispatch_semaphore_wait 函数等待 Dispatch Semaphore 的计数值增加的线程,就由最先等待的线程执行
+             */
+            dispatch_semaphore_signal(semaphore1);
+        });
+    }
+    /**
+     使用结束后释放 semaphore1
+     */
+    dispatch_release(semaphore1);
+}
+/**
+ dispatch_suspend (suspend 暂停/挂起) / dispatch_resume (resume 继续/恢复)
+ */
+-(void)test10{
+
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+
+    /**
+     dispatch_suspend
+     @param <#dispatch_object_t  _Nonnull object#> 要挂起的 Dispatch Queue
+     dispatch_suspend(<#dispatch_object_t  _Nonnull object#>)
+     */
+    dispatch_suspend(queue);
+    /**
+     dispatch_resume
+     @param <#dispatch_object_t  _Nonnull object#> 要恢复的 Dispatch Queue
+     dispatch_resume(<#dispatch_object_t  _Nonnull object#>)
+     */
+    dispatch_resume(queue);
+
+    //注:这些函数对已执行的处理没有任何影响.挂起后,追加到 Dispatch Queue 中但尚未执行的处理在此之后停止执行.而恢复则使得这些处理能够继续执行.
 }
 /**
  dispatch_apply (apply 应用)
@@ -71,8 +169,54 @@
         NSLog(@"%zu:%@",index,[array objectAtIndex:index]);
         NSLog(@"%@",[NSThread currentThread]);
     });
-    //从上面的例子可以看出,
+    //从上面的例子可以看出,dispatch_apply 函数与 dispatch_sync 函数相同,会等待处理执行结束.所以可以使用在 dispatch_async 函数中异步执行 dispatch_apply 函数.
     
+    dispatch_queue_t queue2 = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    /**
+     在 Global Dispatch Queue 这异步执行
+     */
+    dispatch_async(queue, ^{
+        /**
+         Global Dispatch Queue 等待 dispatch_apply 函数全部处理执行结束.
+         */
+        dispatch_apply(array.count, queue2, ^(size_t index) {
+            /**
+             并列处理包含在 NSArray 对象的全部对象
+             */
+            NSLog(@"%zu:%@",index,[array objectAtIndex:index]);
+            NSLog(@"%@",[NSThread currentThread]);
+        });
+    });
+    /**
+     在 Main Dispatch Queue 中异步执行
+     */
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        /**
+         在 Main Dispatch Queue 中执行处理,用户界面更新.
+         */
+        dispatch_apply(array.count, queue2, ^(size_t index) {
+            /**
+             并列处理包含在 NSArray 对象的全部对象
+             */
+            NSLog(@"done finishing");
+        });
+    });
+    /**
+     2017-05-22 10:32:31.037 GCD (多线程)[1140:298792] done finishing
+     2017-05-22 10:32:31.038 GCD (多线程)[1140:306428] 0:123
+     2017-05-22 10:32:31.038 GCD (多线程)[1140:303255] done finishing
+     2017-05-22 10:32:31.038 GCD (多线程)[1140:306426] done finishing
+     2017-05-22 10:32:31.038 GCD (多线程)[1140:306427] done finishing
+     2017-05-22 10:32:31.038 GCD (多线程)[1140:306430] 1:123
+     2017-05-22 10:32:31.038 GCD (多线程)[1140:306434] 2:张三
+     2017-05-22 10:32:31.038 GCD (多线程)[1140:306436] 3:李四
+     2017-05-22 10:32:31.039 GCD (多线程)[1140:306428] <NSThread: 0x60800006e6c0>{number = 21, name = (null)}
+     2017-05-22 10:32:31.039 GCD (多线程)[1140:306430] <NSThread: 0x618000073400>{number = 22, name = (null)}
+     2017-05-22 10:32:31.040 GCD (多线程)[1140:306434] <NSThread: 0x60800006e440>{number = 23, name = (null)}
+     2017-05-22 10:32:31.040 GCD (多线程)[1140:306436] <NSThread: 0x60800006e240>{number = 24, name = (null)}
+     */
 }
 /**
  dispatch_sync sync (synchronous(同步)) (意思是 "非异步" asynchronous(异步))
